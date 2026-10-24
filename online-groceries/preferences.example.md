@@ -1,11 +1,26 @@
 # Grocery preferences
 
-Copy to `preferences.md` (git-ignored) and fill in.
+Created by the skill on first run (or copy to `preferences.md` and fill in). Git-ignored: it stays on your machine.
 
-- Postcode / area: (used only to check who delivers; the address stays on the retailer profile)
-- Already at home: rice, coffee, butter...
-- Likes: ...
-- Never suggest again: ...
-- Cuisines to avoid: ...
-- Equipment: air fryer, induction, slow cooker (model and limits)...
-- Free-delivery threshold per retailer: ...
+## Profile
+- Postcode: (only to check who delivers; the address stays on the retailer account)
+- Household: 1 adult
+- Budget per order: (or "reach free delivery")
+
+## Retailers
+| Retailer | Delivery or pickup | Store preparing the order | Minimum | Free delivery from |
+|----------|--------------------|---------------------------|---------|--------------------|
+|          |                    |                           |         |                    |
+
+## Diet (absolute)
+- Allergies:
+- Diet (vegetarian, halal, gluten-free...):
+
+## Tastes
+- Likes:
+- Cuisines to avoid:
+- Never suggest again: (filled as products get removed)
+- Already at home: rice, coffee...
+
+## Equipment
+- (air fryer, oven, induction, slow cooker with model and limits...)

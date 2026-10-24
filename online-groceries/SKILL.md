@@ -7,6 +7,19 @@ description: 'Build an online grocery basket on French retail sites (Carrefour, 
 
 Method refined over several rejected baskets before one was accepted. The user's tastes, refused products and kitchen equipment live in `preferences.md` next to this file (local, never committed, see `preferences.example.md`): read it before picking a single product.
 
+Requires a browser automation tool that drives the user's own logged-in browser (e.g. Claude in Chrome). Without one, stop and say so: the sites need the user's session.
+
+## First run (no `preferences.md` yet)
+
+Do not guess a profile. Interview the user in one round of questions (AskUserQuestion, at most 4 questions per call, two calls if needed), then write `preferences.md` from `preferences.example.md` and show it back:
+
+1. Postcode and preferred retailers (or "find who delivers").
+2. Household size and target budget per order (or "just reach free delivery").
+3. Diet and allergies (vegetarian, halal, gluten-free, lactose, nut allergy...), and cuisines they dislike.
+4. Kitchen equipment, and staples they already have at home.
+
+Later sessions: re-read the file, never re-ask what it already answers. Update it every time the user removes a product or states a taste.
+
 ## Hard rules
 
 - Never pay, never type a password, never create an account (not even a "test account"): the user logs in and pays. Hand payment to the user as an explicit task, one open at a time.
@@ -14,19 +27,21 @@ Method refined over several rejected baskets before one was accepted. The user's
 - Two baskets ready at two retailers: say clearly to pay for only one.
 - A tab on the checkout page belongs to the user: work in a new tab, never navigate it.
 - Bot protection (DataDome "Access temporarily restricted", CAPTCHA): stop, fall back to a web search, do not bypass it. On a 429: slow down, do not force.
+- Allergies and diet in `preferences.md` are absolute. When a product's ingredients are not certain (ready meals, sauces, "may contain"), open its product page and check; if still unclear, leave it out and say so. Never claim a basket is allergen-free: tell the user to check labels.
+- Prices, fees, thresholds and endpoints below were observed in 2026 and change: read the live values on the site (cart page, delivery info) before relying on them.
 
 ## Workflow
 
-1. **Preferences** (`preferences.md`): tastes, products removed earlier (never suggest them again), equipment, thresholds.
-2. **Who delivers** (if asked): test eligibility on each site with the profile's postcode. Results vary a lot by area: some retailers only offer pickup (drive), some sit behind bot protection, some have a minimum basket.
+1. **Preferences** (`preferences.md`, or the first-run interview): tastes, diet, products removed earlier (never suggest them again), equipment, budget.
+2. **Who delivers** (first run, or if asked): test eligibility on each site with the user's postcode, record the result in `preferences.md` (retailer, delivery or pickup only, minimum, fees, free-delivery threshold). Results vary a lot by area: some retailers only offer pickup (drive), some sit behind bot protection, some have a minimum basket. The store that prepares the order is set by the site from the address: note which one, its promotions are store-specific.
 3. **Start from the promotions, not from products.** Fetch the store's full promotion list, then every special section (see per site). Searching a product and then checking whether it is on sale was rejected: it misses most of the deals.
 4. **Cover every category**: all food aisles (breakfast, sweets, bread, drinks, beer included), hygiene, household cleaning. Skip baby, pets, home, appliances, tech, clothing unless asked.
 5. **Quantities that trigger offers**: "2nd at -X%" → take 2, "3 for 2" → 3.
    **Maximize loyalty cashback**: for an equivalent product at a close price, take the "X% in € on the loyalty card" version; compare price minus cashback. Also report dated operations (e.g. a butcher voucher on a given day) and the delivery slot that triggers them.
 6. **Cleaning products in the entry-level range**: branded promos usually stay more expensive (bin bags on promo 3.95 € vs 0.58 €).
    **Cold cuts**: entry-level ranges are often the weakest point of a basket; prefer a brand or a higher range (Label Rouge, IGP, regional), even in smaller quantity, unless `preferences.md` says otherwise.
-7. **Variety**: a base of meat + starch is not enough on its own. Mix several meats (slow-cooked, grilled, spicy marinated), fish, vegetables, a regional speciality, breakfast items. Cuisines to avoid are listed in `preferences.md`.
-8. **Aim for the free-delivery threshold NET of discounts** with a small margin; recount after every change.
+7. **Variety**: one protein + one starch on repeat is the most common rejection. Mix cooking styles (slow-cooked, grilled, marinated, oven or air fryer), several proteins (for a vegetarian: legumes, eggs, tofu, cheese), fish if eaten, vegetables, a regional speciality, breakfast items. Size quantities to the household. Use the user's equipment in the recipes, and respect its limits.
+8. **Aim for the target**: the user's budget if set, otherwise the free-delivery threshold **net of discounts** with a small margin. Recount after every change.
 9. **Re-read the real cart** (names + quantities) after every batch of additions: keyword search adds false friends (see Error log).
 10. **Recipes**: one page (filter by appliance, temperature and time on each card, "what you need at home"), republished with every new basket.
 11. When the user removes products: re-read the cart, add the removals to `preferences.md` (never suggest again), refill to the threshold with what they kept. If they say "I don't like it" without detail: ask what is wrong before rebuilding.
@@ -40,12 +55,12 @@ All requests from a logged-in carrefour.fr tab, as same-origin `fetch` with `{'A
 - Cart: `GET /api/cart` → `cart.items[].products[]` (`counter`, `product.attributes.ean`, `offerServiceId`), `totalProductsPrice`, `totalDiscount`, `totalFees`, `totalAmount`.
 - Add / set a quantity: `PATCH /api/cart` body `{trackingRequest:[{productId:ean,quantity:n,position:1,listName:'search',source:'search'}], items:[{basketServiceId:offerServiceId, counter:n, ean, subBasketType:'drive_clcv'}]}`. `counter` is **absolute**.
 - `counter: 0` **does not remove** (200 but the product stays). To remove a product: the "Supprimer" or "−" button on `/cart/driveclcv`. To empty: "Vider mon panier" button (site modal) or `DELETE /api/cart`.
-- Delivery fees seen in 2026: 7.90 € under 100 €, 4.90 € from 100 to 150 €, free from 150 € **net of discounts**, 60 € minimum. Check the current values for your store.
+- Delivery fees seen in 2026 for one store: 7.90 € under 100 €, 4.90 € from 100 to 150 €, free from 150 € **net of discounts**, 60 € minimum. They differ by store: read `totalFees` from `GET /api/cart` at different totals.
 - Code `BINGO20` (20 € off from 80 €): first online order only.
 
 ## Super U / Courses U (coursesu.com)
 
-Pick the store once (`/drive-superu-<city>`); home delivery goes through Shopopop, free from 150 € (2026).
+The store is chosen on the site from the postcode (URL `/drive-<store>`, e.g. `/drive-superu-<city>`): note it in `preferences.md`. Home delivery, where offered, goes through Shopopop (free from 150 € in 2026; check).
 
 - Sections to scan (`/c/<slug>?start=N&sz=36`, ~19 extra carousel tiles per page, dedupe by `data-pid`): `promotions`, `prix-coutant`, `prix-mini`, `produits-locaux-et-regionaux`, `20-jours-plus`, `produits-bleu-blanc-coeur`, `nouveautes`, `bio`, plus the **dated operations** listed in the menu (e.g. `en-retrait-le-15-octobre--34-en-bon-dachat-sur-la-boucherie-volaille`: 34% of all fresh meat back as a voucher if delivered that day → tell the user so they pick that slot). "Idées repas" are recipe pages, not products.
 - **Sequential requests with ~800 ms pause**: in parallel the site returns 429.
